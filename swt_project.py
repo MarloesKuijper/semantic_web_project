@@ -84,7 +84,7 @@ def get_infobox_name_in_dutch(lang, page):
         return None
 
 
-
+print(get_infobox_name_in_dutch("de", "Tony Blair"))
 
 def build_multilingual_dict(files):
     """ files is a list with tuples (lang, f1), (lang, f2) 
@@ -162,38 +162,47 @@ def get_common_with_manipulation(lang1, lang2, common_without_manipulation, lang
     return common_with_manipulation
 
 def get_data(file):
-    """ TO DO: add translation step for German template name  """
+    """ get data from file"""
     data = {}
     for line in file:
         if not line.startswith("#"):
-            print(line)
-            #print(shlex.split(line))
-            page, attribute, value, metadata, period = shlex.split(line)
+            try:
+                page, attr, val, meta, period = shlex.split(line)
+            except ValueError:
+                try:
+                    page, attr, val, meta, period = re.findall(r'(?:"[^"]*"|[^\s"])+', line)
+                except ValueError:
+                    if (line.find('""')) >= 0:
+                        items = re.findall(r'(?:"[^"]*"|[^\s"])+', line)
+                        page = items[0]
+                        attr = items[1]
+                        val = items[2:-2]
+                        meta = items[-2]
+                        period = items[-1]
             page_name = page.split("/")[-1][:-1]
             template = template_startindex = meta.find("template") 
             template_endindex = meta.find("&", template_startindex)
             template = meta[template_startindex+9: template_endindex]
-            if page_name in nl_data:
+            if page_name in data:
                 data[page_name]["page"].append(page)
-                data[page_name]["attribute"].append(attribute)
-                data[page_name]["value"].append(value)
+                data[page_name]["attribute"].append(attr)
+                data[page_name]["value"].append(val)
                 data[page_name]["template"].append(template)
             else:
-                nl_data[page_name] = {}
-                nl_data[page_name]["page"] = []
-                nl_data[page_name]["page"].append(page)
-                nl_data[page_name]["attribute"] = []
-                nl_data[page_name]["attribute"].append(attribute)
-                nl_data[page_name]["value"] = []
-                nl_data[page_name]["value"].append(value)
-                nl_data[page_name]["template"] = []
-                nl_data[page_name]["template"].append(template)
+                data[page_name] = {}
+                data[page_name]["page"] = []
+                data[page_name]["page"].append(page)
+                data[page_name]["attribute"] = []
+                data[page_name]["attribute"].append(attr)
+                data[page_name]["value"] = []
+                data[page_name]["value"].append(val)
+                data[page_name]["template"] = []
+                data[page_name]["template"].append(template)
 
     return data
 
 with open("data1016/literals_nl_short.tql", encoding="utf-8") as f1, open("data1016/literals_de_short.tql", encoding="utf-8") as f2:
     ## STEP 1: get all attribute translations
-
     translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
     save_multiling_dict(translation_dict, "multilingdict_short.pickle")
 
@@ -202,10 +211,15 @@ with open("data1016/literals_nl_short.tql", encoding="utf-8") as f1, open("data1
 
 
     ### STEP 2: get all matching pages in both languages and compare so you can add missing attributes
-    # nl_data = get_data(f1)
-    # de_data = get_data(f2)
-    # common_without_manipulation = set(nl_data.keys()) & set(de_data.keys())
-    #common_with_manipulation_nl = get_common_with_manipulation(nl_data, de_data, common_without_manipulation, "nl", "de")
-    #common_with_manipulation_de = get_common_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
-    #common_pages = common_with_manipulation_nl | common_with_manipulation_de # these are the ones that you can compare to add missing attributes
+    nl_data = get_data(f1)
+    de_data = get_data(f2)
+    common_without_manipulation = set(nl_data.keys()) & set(de_data.keys())
+    common_with_manipulation_nl = get_common_with_manipulation(nl_data, de_data, common_without_manipulation, "nl", "de")
+    common_with_manipulation_de = get_common_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
+    common_pages = common_with_manipulation_nl | common_with_manipulation_de # these are the ones that you can compare to add missing attributes
+
+    # vergelijk common pages met elkaar (dus pagina van Obama in NL met Obama in DE)
+    # fetch de template naam in het NL, en query de ling_dict met die template naam
+    # kijk welke data mist voor die pagina combinatie (NL-DE en DE-NL) en kijk of die attributen zijn vertaald in de dictionary
+    # wanneer dat zo is kan je nieuwe quadruples samenstellen
 
