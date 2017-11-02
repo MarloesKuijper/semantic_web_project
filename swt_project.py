@@ -140,7 +140,7 @@ def build_multilingual_dict(files):
 
 
 
-def get_common_with_manipulation(lang1, lang2, common_without_manipulation, lang_code_source, lang_code_target):
+def get_common_pages_with_manipulation(lang1, lang2, common_without_manipulation, lang_code_source, lang_code_target):
     """parameters: source_lang, target_lang, set of items that are already found without manipulation, lang_code source and lang_code target
     it checks if a page match (in both languages) was already found with common_without_manipulation, if not it gets the translation from source to target
     if this translation is found in the pages of target_language, it is converted to proper format and added to common_with_manipulation
@@ -155,7 +155,10 @@ def get_common_with_manipulation(lang1, lang2, common_without_manipulation, lang
                 translation = translation.replace(" ", "_")
                 if translation in lang2.keys():
                     print(translation)
-                    common_with_manipulation.add(translation)
+                    if lang_code_target == "nl" # als het DE - NL vertaling is draaien we de volgorde om voor consistentie over alle resultaten
+                        common_with_manipulation.add((translation, k))
+                    else:
+                        common_with_manipulation.add((k, translation))
             
                     
 
@@ -214,9 +217,11 @@ with open("data1016/literals_nl_short.tql", encoding="utf-8") as f1, open("data1
     nl_data = get_data(f1)
     de_data = get_data(f2)
     common_without_manipulation = set(nl_data.keys()) & set(de_data.keys())
-    common_with_manipulation_nl = get_common_with_manipulation(nl_data, de_data, common_without_manipulation, "nl", "de")
-    common_with_manipulation_de = get_common_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
-    common_pages = common_with_manipulation_nl | common_with_manipulation_de # these are the ones that you can compare to add missing attributes
+    common_without_manipulation = set((item, item)for item in common_without_manipulation)
+    common_with_manipulation_nl = get_common_pages_with_manipulation(nl_data, de_data, common_without_manipulation, "nl", "de")
+    common_with_manipulation_de = get_common_pages_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
+
+    common_pages = common_with_manipulation_nl | common_with_manipulation_de | common_without_manipulation # these are the ones that you can compare to add missing attributes
 
     # vergelijk common pages met elkaar (dus pagina van Obama in NL met Obama in DE)
     # fetch de template naam in het NL, en query de ling_dict met die template naam
