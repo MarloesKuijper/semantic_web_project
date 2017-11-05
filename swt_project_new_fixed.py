@@ -264,6 +264,7 @@ def get_missing_quadruples(missing_data):
                                 outfile.write(new_quadruple)
                                 outfile.write("\n")
 
+
 def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
     for nl_page, de_page in common_pages:
         page_lines_nl = [line for line in lines_nl if line.split()[0].split("/")[-1][:-1] == nl_page]
@@ -282,12 +283,6 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
         template_endindex = meta_nl.find("&", template_startindex)
         template = meta_nl[template_startindex+9: template_endindex] # we gaan ervan uit dat voor de NL pagina's de template altijd hetzelfde is voor alle attributen (voor DE is dit niet altijd zo!)
 
-        ####################################################################
-        ##### WAT IN DIT VAK STAAT VERVANGEN MET AUTOMATISCH GEGENEREERDE NAMEN VAN ATTRIBUTEN DIE MISSEN IN NL EN WEL AANWEZIG ZIJN IN DE EN ANDERSOM
-        #### TIP: hierboven zie je 'attributes_nl' en 'attributes_de', dat zijn de attributen voor die pagina voor beide talen
-        #### als je daar sets van maakt en dan 'SET_NL.difference(SET_DE)' gebruikt (set operation 'difference') dan krijg je alles wat in NL voorkomt maar niet in DE
-        #### vervolgens doe je hem andersom voor duits
-        #### als je de resultaten gewoon weer aan de variabelen 'missing_dutch' en 'missing_german' koppelt dan hebben we het al!!!
         print("{0}{1}".format("template name: ", template))
         print("{0}\t\t{1}".format(nl_page, de_page))
         print()
