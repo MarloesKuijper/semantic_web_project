@@ -8,6 +8,7 @@ import requests
 import pickle
 import re
 from time import sleep
+from collections import Counter
 
 def save_multiling_dict(dict, file):
     pickle.dump(dict, open(file, "wb"))
@@ -236,7 +237,7 @@ def normalize_value(value, target_lang):
 
 def get_missing_quadruples(missing_data):
     lang = missing_data[0]
-    missing_attributes = str(missing_data[1])
+    missing_attributes = missing_data[1]
     ling_dict = missing_data[2]
     template = missing_data[3]
     page_lines_other_lang = missing_data[4]
@@ -244,25 +245,25 @@ def get_missing_quadruples(missing_data):
     full_page_name = missing_data[6]
     if template in ling_dict:
         if missing_attributes != "NONE":
-            for item in missing_attributes.split(","):
+            for item in missing_attributes:
                 item = item.strip()
                 if item in ling_dict[template]:
                     translations_list = ling_dict[template][item]
-                    for tup in translations_list:
-                        if tup[0] == lang:
-                            translation = tup[1]
-                            corresponding_line_other_lang = next((x for x in page_lines_other_lang if x.split()[1].split("/")[-1][:-1] == item), None)
-                            attr_english = corresponding_line_other_lang.split()[1]
-                            val_other_lang = " ".join(corresponding_line_other_lang.split()[2:-2])
-                            value = normalize_value(val_other_lang, lang)
-                            property_begin = meta.find("property")
-                            property_end = meta.find("&", property_begin)
-                            meta = meta.replace(meta[property_begin:property_end], "property=" + translation)
+                    translations = [item for language, item in translations_list if language == lang]
+                    if translations:
+                        most_common_translation = Counter(translations).most_common(1)[0][0]
+                        corresponding_line_other_lang = next((x for x in page_lines_other_lang if x.split()[1].split("/")[-1][:-1] == item), None)
+                        attr_english = corresponding_line_other_lang.split()[1]
+                        val_other_lang = " ".join(corresponding_line_other_lang.split()[2:-2])
+                        value = normalize_value(val_other_lang, lang)
+                        property_begin = meta.find("property")
+                        property_end = meta.find("&", property_begin)
+                        meta = meta.replace(meta[property_begin:property_end], "property=" + most_common_translation)
 
-                            new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
-                            with open("data1016/newquadruples.tql", "a+") as outfile:
-                                outfile.write(new_quadruple)
-                                outfile.write("\n")
+                        new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
+                        with open("test.tql", "a+", encoding="utf-8") as outfile:
+                            outfile.write(new_quadruple)
+                            outfile.write("\n")
 
 
 def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
@@ -283,21 +284,11 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
         template_endindex = meta_nl.find("&", template_startindex)
         template = meta_nl[template_startindex+9: template_endindex] # we gaan ervan uit dat voor de NL pagina's de template altijd hetzelfde is voor alle attributen (voor DE is dit niet altijd zo!)
 
-        print("{0}{1}".format("template name: ", template))
-        print("{0}\t\t{1}".format(nl_page, de_page))
-        print()
-        print("{0:<15}\t\t{1:>15}".format("Attributes NL", "Attributes DE"))
-        print()
-        for i, item in enumerate(attributes_nl):
-            print("{0:<15}\t\t{1:>15}".format(item, attributes_de[i]))
 
-        print()
         missing_dutch = set_DE.difference(set_NL)
-        # x = input("Which Dutch attributes are missing that are present for GERMAN? FORMAT: NONE if none are missing, otherwise type attributes separated by commas (e.g. name, birthDate, age etc.):\n")
-        print()
+
         missing_german = set_NL.difference(set_DE)
-        # input("Which German attributes are missing that are present for DUTCH? FORMAT: NONE if none are missing, otherwise type attributes separated by commas (e.g. name, birthDate, age etc.):\n")
-        print()
+
 
         #######################################################################
 
@@ -306,18 +297,17 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
 
 if __name__ == "__main__":
 
-    FILE_NL = "data1016/testeval_nl.tql"
-    FILE_DE = "data1016/testeval_de.tql"
+    FILE_NL = "data1016/literals_nl_evaluation.tql"
+    FILE_DE = "data1016/literals_de_evaluation.tql"
     with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
         ## STEP 1: get all attribute translations
         translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
-        save_multiling_dict(translation_dict, "multilingdict_tiny.pickle")
 
-        data = load_multiling_dict("multilingdict_tiny.pickle")
-        print(data)
+        # data = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
+        # print(data)
 
     ### STEP 2: get all matching pages in both languages and compare so you can add missing attributes
     common_pages = get_common_pages(FILE_NL, FILE_DE)
     nl_lines = get_lines(FILE_NL)
     de_lines = get_lines(FILE_DE)
-    evaluation_step2(common_pages, data, nl_lines, de_lines)
+    evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
