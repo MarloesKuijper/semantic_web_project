@@ -97,6 +97,7 @@ def build_multilingual_dict(files):
     to ling_dict[dutchinfoboxname][attributename] we add the (lang, translation) tuple so we get the translation of the attribute and the language specifies the language of the translation
     returns a dict that for each template has attributes with their corresponding translations, as well as the german translation of the infobox if found (useful for later use)"""
     ling_dict = {}
+    templates_dict = {}
     for lang, file in files:
         for line in file:
             if not line.startswith("#"):
@@ -124,11 +125,20 @@ def build_multilingual_dict(files):
                 template_endindex = meta.find("&", template_startindex)
                 template = meta[template_startindex+9: template_endindex]
                 if lang == "de":
-                    translated_infobox = get_infobox_name_in_dutch(lang, page_name)
-                    if translated_infobox != None:
-                        template = translated_infobox
+                    template_de = template
+                    if page_name in templates_dict and template_de in templates_dict[page_name]:
+                        template = templates_dict[page_name][template_de]
                     else:
-                        template = "GERMAN." + meta[template_startindex+9: template_endindex]
+                        translated_infobox = get_infobox_name_in_dutch(lang, page_name)
+                        if translated_infobox != None:
+                            template = translated_infobox
+                            if page_name in templates_dict:
+                                templates_dict[page_name][template_de] = template
+                            else:
+                                templates_dict[page_name] = {}
+                                templates_dict[page_name][template_de] = template
+                        else:
+                            template = "GERMAN." + meta[template_startindex+9: template_endindex]
                 if template in ling_dict:
                     if attr_short in ling_dict[template]:
                         ling_dict[template][attr_short].append((lang, translation))
@@ -261,7 +271,7 @@ def get_missing_quadruples(missing_data):
                         meta = meta.replace(meta[property_begin:property_end], "property=" + most_common_translation)
 
                         new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
-                        with open("test.tql", "a+", encoding="utf-8") as outfile:
+                        with open("test1.tql", "a+", encoding="utf-8") as outfile:
                             outfile.write(new_quadruple)
                             outfile.write("\n")
 
@@ -289,7 +299,6 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
 
         missing_german = set_NL.difference(set_DE)
 
-
         #######################################################################
 
         for item in [("nl", missing_dutch, ling_dict, template, page_lines_de, meta_nl, full_page_nl), ("de", missing_german, ling_dict, template, page_lines_nl, meta_de, full_page_de)]:
@@ -297,17 +306,17 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
 
 if __name__ == "__main__":
 
-    FILE_NL = "data1016/literals_nl_evaluation.tql"
-    FILE_DE = "data1016/literals_de_evaluation.tql"
+    FILE_NL = "../data1016/mappingbased_literals_nl.tql"
+    FILE_DE = "../data1016/mappingbased_literals_de_300k.tql"
     with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
         ## STEP 1: get all attribute translations
         translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
-
+        save_multiling_dict(translation_dict, "../multilingual_dict_300k.pickle")
         # data = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
         # print(data)
 
     ### STEP 2: get all matching pages in both languages and compare so you can add missing attributes
-    common_pages = get_common_pages(FILE_NL, FILE_DE)
-    nl_lines = get_lines(FILE_NL)
-    de_lines = get_lines(FILE_DE)
-    evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
+    # common_pages = get_common_pages(FILE_NL, FILE_DE)
+    # nl_lines = get_lines(FILE_NL)
+    # de_lines = get_lines(FILE_DE)
+    # evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
