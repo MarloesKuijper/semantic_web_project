@@ -17,6 +17,24 @@ def save_multiling_dict(dict, file):
 def load_multiling_dict(file):
     return pickle.load(open(file, "rb"))
 
+def checkEquality(dict_eval, dict_auto, path=""):
+    for k in dict_eval.keys():
+        if not k in dict_auto:
+            print(path, ":")
+            print(k + " is not in dict_auto")
+        else:
+            if type(dict_eval[k]) is dict:
+                if path == "":
+                    path = k
+                else:
+                    path = path + "->" + k
+                checkEquality(dict_eval[k],dict_auto[k], path)
+            else:
+                if sorted(dict_eval[k], key=lambda tup: tup[0]) != sorted(dict_auto[k], key=lambda tup: tup[0]):
+                    print(path, ":")
+                    print("dict_eval", k," : ", dict_eval[k])
+                    print("dict_auto", k," : ", dict_auto[k])
+
 def get_lines(file):
     with open(file, "r", encoding="utf-8") as file:
         return [line for line in file]
@@ -237,13 +255,16 @@ def normalize_value(value, target_lang):
         value = value.replace(value[index_apestaartje:], "@" + target_lang)
     brackets_left = value.find("(")
     brackets_right = value.find(")")
-    if brackets_left >= 0 and brackets_right >= 0 and brackets_right > brackets_left:
+    while brackets_left >= 0 and brackets_right >= 0 and brackets_right > brackets_left:
         if value[brackets_left-1] == " ":
             value = value.replace(value[brackets_left-1:brackets_right+1], "")
         else:
             value = value.replace(value[brackets_left:brackets_right+1], "")
+        brackets_left = value.find("(")
+        brackets_right = value.find(")")
 
     return value
+
 
 def get_missing_quadruples(missing_data):
     lang = missing_data[0]
@@ -271,7 +292,7 @@ def get_missing_quadruples(missing_data):
                         meta = meta.replace(meta[property_begin:property_end], "property=" + most_common_translation)
 
                         new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
-                        with open("test1.tql", "a+", encoding="utf-8") as outfile:
+                        with open("newquadruples_automatic.tql", "a+", encoding="utf-8") as outfile:
                             outfile.write(new_quadruple)
                             outfile.write("\n")
 
@@ -306,17 +327,21 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
 
 if __name__ == "__main__":
 
-    FILE_NL = "../data1016/mappingbased_literals_nl.tql"
-    FILE_DE = "../data1016/mappingbased_literals_de_300k.tql"
-    with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
+    FILE_NL = "../data1016/literals_nl_evaluation.tql"
+    FILE_DE = "../data1016/literals_de_evaluation.tql"
+    # with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
         ## STEP 1: get all attribute translations
-        translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
-        save_multiling_dict(translation_dict, "../multilingual_dict_300k.pickle")
+        # translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
+        # save_multiling_dict(translation_dict, "../multilingual_dict_300k.pickle")
         # data = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
         # print(data)
 
     ### STEP 2: get all matching pages in both languages and compare so you can add missing attributes
-    # common_pages = get_common_pages(FILE_NL, FILE_DE)
-    # nl_lines = get_lines(FILE_NL)
-    # de_lines = get_lines(FILE_DE)
-    # evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
+    #translation_dict = load_multiling_dict("../results_evaluation/evaluationdictfinal.pickle")
+    translation_dict = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
+    common_pages = get_common_pages(FILE_NL, FILE_DE)
+    nl_lines = get_lines(FILE_NL)
+    de_lines = get_lines(FILE_DE)
+    evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
+
+   

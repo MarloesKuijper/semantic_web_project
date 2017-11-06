@@ -1,5 +1,5 @@
 import shlex
-from swt_project import get_infobox_name_in_dutch, get_translation, save_multiling_dict, load_multiling_dict, get_data, get_common_pages_with_manipulation
+from swt_project_official import get_infobox_name_in_dutch, get_translation, save_multiling_dict, load_multiling_dict, get_data, get_common_pages_with_manipulation
 import re
 import pickle
 from collections import Counter
@@ -12,8 +12,9 @@ def evaluation_step1(files, lang_dict=None):
     """attribute translation to dict
     attribute is list of (lang, file) tuples as parameter 1, parameter 2 is option in case you have stopped evaluation and want to use a temporary dictionary, please also 
     change the file if you do this > don't use the full file but the remainder of the file from where you stopped"""
+    print()
     print("Welcome to evaluation step 1")
-    print("You will get to see an english attribute name e.g. birthYear, and some meta-data, you will have to select the property value from the meta-data")
+    print("You will get to see an english attribute name e.g. birthYear, and some metadata, you will have to select the property value from the metadata")
     print()
     if lang_dict:
         ling_dict = pickle.load(open(lang_dict, "rb"))
@@ -39,8 +40,10 @@ def evaluation_step1(files, lang_dict=None):
                     page_name = page.split("/")[-1][:-1]
                     attr_short = attr.split("/")[-1][:-1]
                     print("English attribute name: ", attr_short)
-                    print("Find the translation in the metadata")
+                    print()
+                    print("Find the translation in the metadata:")
                     print(meta)
+                    print()
                     translation = input("Type the translation here: ")
                     if translation == "#EXIT":
                         save_multiling_dict(ling_dict, "data1016/temp.pickle")
@@ -74,7 +77,7 @@ def evaluation_step1(files, lang_dict=None):
                             ling_dict[template]["translation_de"] = meta[template_startindex+9: template_endindex]
 
 
-    save_multiling_dict(ling_dict, "data1016/evaluationdict.pickle")
+    save_multiling_dict(ling_dict, "data1016/x.pickle")
     return ling_dict
 
 def get_common_pages(file_nl, file_de):
@@ -95,11 +98,13 @@ def normalize_value(value, target_lang):
         value = value.replace(value[index_apestaartje:], "@" + target_lang)
     brackets_left = value.find("(")
     brackets_right = value.find(")")
-    if brackets_left >= 0 and brackets_right >= 0 and brackets_right > brackets_left:
+    while brackets_left >= 0 and brackets_right >= 0 and brackets_right > brackets_left:
         if value[brackets_left-1] == " ":
             value = value.replace(value[brackets_left-1:brackets_right+1], "")
         else:
             value = value.replace(value[brackets_left:brackets_right+1], "")
+        brackets_left = value.find("(")
+        brackets_right = value.find(")")
 
     return value
 
@@ -131,7 +136,7 @@ def get_missing_quadruples(missing_data):
                             
                         new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
                         print(new_quadruple)
-                        with open("data1016/newquadruples_evaluation.tql", "a+", encoding="utf-8") as outfile:
+                        with open("newquadruples_manual.tql", "a+", encoding="utf-8") as outfile:
                             outfile.write(new_quadruple)
                             outfile.write("\n")
 
@@ -150,6 +155,8 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
         template_startindex = meta_nl.find("template") 
         template_endindex = meta_nl.find("&", template_startindex)
         template = meta_nl[template_startindex+9: template_endindex] # we gaan ervan uit dat voor de NL pagina's de template altijd hetzelfde is voor alle attributen (voor DE is dit niet altijd zo!)
+        print()
+        print()
         print("{0}{1}".format("template name: ", template))
         print("{0}\t\t{1}".format(nl_page, de_page))
         print()
@@ -157,14 +164,14 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
         print()
         if len(attributes_nl) > len(attributes_de):
             for i, item in enumerate(attributes_de):
-                print("{0:<15}\t\t{1:>15}".format(attributes_nl[i], item))
+                print("{0:<25}{1:<25}".format(attributes_nl[i], item))
             for i in range(len(attributes_nl) - len(attributes_de)):
-                print("{0:>15}".format(attributes_nl[i+len(attributes_de)]))
+                print("{0:<25}".format(attributes_nl[i+len(attributes_de)]))
         else:
             for i, item in enumerate(attributes_nl):
-                print("{0:<15}\t\t{1:>15}".format(item, attributes_de[i]))
+                print("{0:<25}{1:>25}".format(item, attributes_de[i]))
             for i in range(len(attributes_de) - len(attributes_nl)):
-                print("\t\t\t\t\t{0:>15}".format(attributes_de[i+len(attributes_nl)]))
+                print("{0:>50}".format(attributes_de[i+len(attributes_nl)]))
         
         print()
         missing_dutch = input("Which Dutch attributes are missing that are present for GERMAN? FORMAT: NONE if none are missing, otherwise type attributes separated by commas (e.g. name, birthDate, age etc.):\n")
