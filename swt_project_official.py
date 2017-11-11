@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
-# match property in english (e.g. Population total) with property name in 4th parameter = property, do this separately for each template
-# for each template find matching pages in both languages, for each attribute (english) (with translations) check if one language has that attribute and the other doesn't, in this case you can add it in the missing language
-
-
 import shlex
 import requests
 import pickle
 import re
 from time import sleep
 from collections import Counter
+from tqdm import tqdm
 
 def save_multiling_dict(dict, file):
     pickle.dump(dict, open(file, "wb"))
@@ -39,7 +36,7 @@ def get_lines(file):
     with open(file, "r", encoding="utf-8") as file:
         return [line for line in file]
 
-def get_translation(request, lang_code_source, lang_code_target):
+def get_translation(request, lang_code_source, lang_code_target, common_with_manipulation):
     """ takes as parameters the dict with prop and titles, the lang code source and lang code target
     returns pagename in target language if found, otherwise empty string"""
     request['action'] = 'query'
@@ -50,6 +47,7 @@ def get_translation(request, lang_code_source, lang_code_target):
     except:
         print("Connection refused by the server..")
         print("ZZzzzz...")
+        pickle.dump(common_with_manipulation, open("common_with_manipulation_temp.pickle", "wb"))
         sleep(5)
         result = requests.get('https://{}.wikipedia.org/w/api.php'.format(lang_code_source), params=request).json()
 
@@ -107,13 +105,11 @@ def get_infobox_name_in_dutch(lang, page):
         return None
 
 
-#print(get_infobox_name_in_dutch("de", "Tony Blair"))
-
 def build_multilingual_dict(files):
     """ files is a list with tuples (lang, f1), (lang, f2)
     for each line in a file we make sure we get the dutch infobox name which serves as key in ling_dict (if not, GERMAN.infoboxname is used)
     to ling_dict[dutchinfoboxname][attributename] we add the (lang, translation) tuple so we get the translation of the attribute and the language specifies the language of the translation
-    returns a dict that for each template has attributes with their corresponding translations, as well as the german translation of the infobox if found (useful for later use)"""
+    returns a dict that for each template has attributes with their corresponding translations, as well as the german translation of the infobox if found (potentially useful for later use)"""
     ling_dict = {}
     templates_dict = {}
     for lang, file in files:
@@ -175,15 +171,19 @@ def build_multilingual_dict(files):
 
 def get_common_pages(file_nl, file_de):
     with open(file_nl, encoding="utf-8") as file_nl, open(file_de, encoding="utf-8") as file_de:
-        nl_data = get_data(file_nl)
-        de_data = get_data(file_de)
+         nl_data = get_data(file_nl)
+         de_data = get_data(file_de)
+
     common_without_manipulation = set(nl_data.keys()) & set(de_data.keys())
     common_without_manipulation = set((item, item)for item in common_without_manipulation)
+     
     common_with_manipulation_nl = get_common_pages_with_manipulation(nl_data, de_data, common_without_manipulation, "nl", "de")
-    common_with_manipulation_de = get_common_pages_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
-    common_pages = common_with_manipulation_nl | common_with_manipulation_de  | common_without_manipulation# these are the ones that you can compare to add missing attributes
 
-    return common_pages
+    common_with_manipulation_de = get_common_pages_with_manipulation(de_data, nl_data, common_without_manipulation, "de", "nl")
+  
+    common_pages = common_with_manipulation_de  | common_with_manipulation_nl | common_without_manipulation # these are the ones that you can compare to add missing attributes
+
+    return common_with_manipulation_de
 
 
 def get_common_pages_with_manipulation(lang1, lang2, common_without_manipulation, lang_code_source, lang_code_target):
@@ -192,12 +192,13 @@ def get_common_pages_with_manipulation(lang1, lang2, common_without_manipulation
     if this translation is found in the pages of target_language, it is converted to proper format and added to common_with_manipulation
     returns the set common_with_manipulation"""
     common_with_manipulation = set()
-    for k, v in lang1.items():
+    for k, v in tqdm(lang1.items()):
         if k in common_without_manipulation:
             pass
         else:
-            translation = get_translation({'prop': 'langlinks', "titles":k}, lang_code_source, lang_code_target)
+            translation = get_translation({'prop': 'langlinks', "titles":k}, lang_code_source, lang_code_target, common_with_manipulation)
             if translation:
+                print(translation)
                 translation = translation.replace(" ", "_")
                 if translation in lang2.keys():
                     if lang_code_target == "nl": # als het DE - NL vertaling is draaien we de volgorde om voor consistentie over alle resultaten
@@ -292,13 +293,13 @@ def get_missing_quadruples(missing_data):
                         meta = meta.replace(meta[property_begin:property_end], "property=" + most_common_translation)
 
                         new_quadruple = "{0} {1} {2} {3} {4}".format(full_page_name, attr_english, value, meta, ".")
-                        with open("newquadruples_automatic.tql", "a+", encoding="utf-8") as outfile:
+                        with open("newquadruples_automatic_large_dataset.tql", "a+", encoding="utf-8") as outfile:
                             outfile.write(new_quadruple)
                             outfile.write("\n")
 
 
-def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
-    for nl_page, de_page in common_pages:
+def compare_pages(common_pages, ling_dict, lines_nl, lines_de):
+    for nl_page, de_page in tqdm(common_pages):
         page_lines_nl = [line for line in lines_nl if line.split()[0].split("/")[-1][:-1] == nl_page]
         page_lines_de = [line for line in lines_de if line.split()[0].split("/")[-1][:-1] == de_page]
         attributes_nl = sorted([line.split()[1].split("/")[-1][:-1] for line in page_lines_nl])
@@ -313,35 +314,35 @@ def evaluation_step2(common_pages, ling_dict, lines_nl, lines_de):
         full_page_de = page_lines_de[0].split()[0]
         template_startindex = meta_nl.find("template")
         template_endindex = meta_nl.find("&", template_startindex)
-        template = meta_nl[template_startindex+9: template_endindex] # we gaan ervan uit dat voor de NL pagina's de template altijd hetzelfde is voor alle attributen (voor DE is dit niet altijd zo!)
-
+        template = meta_nl[template_startindex+9: template_endindex]
 
         missing_dutch = set_DE.difference(set_NL)
-
         missing_german = set_NL.difference(set_DE)
-
-        #######################################################################
 
         for item in [("nl", missing_dutch, ling_dict, template, page_lines_de, meta_nl, full_page_nl), ("de", missing_german, ling_dict, template, page_lines_nl, meta_de, full_page_de)]:
             get_missing_quadruples(item)
 
+        with open("page_names_done.txt", "a+", encoding="utf-8") as outfile:
+            outfile.write(nl_page)
+            outfile.write("\n")
+            outfile.write(de_page)
+            outfile.write("\n")
+
 if __name__ == "__main__":
 
-    FILE_NL = "../data1016/literals_nl_evaluation.tql"
-    FILE_DE = "../data1016/literals_de_evaluation.tql"
-    # with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
-        ## STEP 1: get all attribute translations
-        # translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
-        # save_multiling_dict(translation_dict, "../multilingual_dict_300k.pickle")
-        # data = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
-        # print(data)
+    FILE_NL = "../data1016/mappingbased_literals_nl.tql"
+    FILE_DE = "../data1016/mappingbased_literals_de_300k.tql"
+    with open(FILE_NL, encoding="utf-8") as f1, open(FILE_DE, encoding="utf-8") as f2:
+        # STEP 1: get all attribute translations
+        translation_dict = build_multilingual_dict([("nl", f1), ("de", f2)])
+        save_multiling_dict(translation_dict, "../multilingual_dict_300k.pickle")
+        
 
     ### STEP 2: get all matching pages in both languages and compare so you can add missing attributes
-    #translation_dict = load_multiling_dict("../results_evaluation/evaluationdictfinal.pickle")
-    translation_dict = load_multiling_dict("../results_evaluation/automatic_evaluation_dict.pickle")
     common_pages = get_common_pages(FILE_NL, FILE_DE)
+    
     nl_lines = get_lines(FILE_NL)
     de_lines = get_lines(FILE_DE)
-    evaluation_step2(common_pages, translation_dict, nl_lines, de_lines)
+    compare_pages(common_pages, translation_dict, nl_lines, de_lines)
 
    

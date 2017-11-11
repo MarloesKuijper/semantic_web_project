@@ -10,8 +10,8 @@ def get_lines(file):
 
 def evaluation_step1(files, lang_dict=None):
     """attribute translation to dict
-    attribute is list of (lang, file) tuples as parameter 1, parameter 2 is option in case you have stopped evaluation and want to use a temporary dictionary, please also 
-    change the file if you do this > don't use the full file but the remainder of the file from where you stopped"""
+    attribute is list of (lang, file) tuples as parameter 1, parameter 2 is option in case you have stopped evaluation and want to use a temporary dictionary, also 
+    change the file if you do this > use the remainder of the file from where you stopped"""
     print()
     print("Welcome to evaluation step 1")
     print("You will get to see an english attribute name e.g. birthYear, and some metadata, you will have to select the property value from the metadata")
@@ -191,21 +191,10 @@ FILES_DE = "../data1016/literals_de_evaluation.tql"
 
 
 data = load_multiling_dict("data1016/evaluationdictfinal.pickle")
-#print(ling_dict)
 
 common_pages = get_common_pages(FILES_NL, FILES_DE)
-print(common_pages)
+
 nl_lines = get_lines(FILES_NL)
 de_lines = get_lines(FILES_DE)
 
 evaluation_step2(common_pages, data, nl_lines, de_lines)
-
-
-
-# code/postal code, foundation / founding year, 
-# postal code / nick voor steden
-# some never occur in both: flag, blazon NL, areaWater, areaTotal, areaLand DE
-# gold list > postal code nickname, tennis tournaments
-
-# TO: aanpassing swt > tuples
-# run evaluation op swt
